@@ -1,0 +1,6 @@
+Teams = {
+    {},
+    {},
+}
+
+MaxTeamSize = 4
