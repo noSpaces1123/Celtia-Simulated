@@ -176,7 +176,7 @@ end
 --Requires Löve2D. Renders a rectangle of the specified color and alpha over the entirety of the screen (be wary of graphics transformations you may have applied). Supply a table `color`, containing the RGB and alpha values of the overlay.
 function zutil.overlay(color)
     love.graphics.setColor(color)
-    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    love.graphics.rectangle("fill", WINDOW.ORIGIN_X, WINDOW.ORIGIN_Y, love.graphics.getWidth(), love.graphics.getHeight())
 end
 
 --Requires Löve2D. Initialises global variables WINDOW.WIDTH, WINDOW.HEIGHT, WINDOW.CENTER_X, and WINDOW.CENTER_Y, sets file identity, sets window title, turns on highdpi setting, and sets window dimensions. `setModeFlags` must be a table with the
@@ -187,8 +187,8 @@ function zutil.standardinitialization(windowWidth, windowHeight, gameName, setMo
         WIDTH = love.graphics.getWidth(),
         HEIGHT = love.graphics.getHeight(),
     }
-    WINDOW.CENTER_X = WINDOW.WIDTH / 2
-    WINDOW.CENTER_Y = WINDOW.HEIGHT / 2
+    WINDOW.HALF_WIDTH = WINDOW.WIDTH / 2
+    WINDOW.HALF_HEIGHT = WINDOW.HEIGHT / 2
 
     love.window.setTitle(gameName)
     love.filesystem.setIdentity(gameName)

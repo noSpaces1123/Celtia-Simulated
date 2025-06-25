@@ -36,8 +36,9 @@ GuyRendering = {
     spacingBetweenGuys = 20,
     spacingBetweenCels = 10,
     unitYOffset = 450,
-    celWidth = GuyEncyclopedia[1].sprite:getWidth() / 3, liveCelRenderWidthMultiplier = .9, deadCelRenderWidthMultiplier = .7,
+    celWidth = GuyEncyclopedia[1].sprite:getWidth() / 3, liveCelRenderWidthMultiplier = .85, deadCelRenderWidthMultiplier = .65,
     guyDPIScale = guyDPIScale,
+    deadCelAlpha = .35,
 }
 GuyRendering.celHeight = GuyRendering.celWidth
 
@@ -66,12 +67,21 @@ function UpdateCelAttackQueue()
                     if cel == 1 and item.target.cels[y][x] == 1 then
                         item.target.cels[y][x] = 0
 
-                        for _ = 1, 15 do
+                        for _ = 1, 30 do
                             local px, py = GetCelRenderCoordsAndWidth(item.target.myTeamIndex, item.target.myGuyIndexInTheTeam, x, y)
                             table.insert(Particles, NewParticle(px + GuyRendering.celWidth / 2, py + GuyRendering.celHeight / 2, math.random()*4+2, {1,1,1}, math.random()*6+2, math.random(360), 0,
-                            math.random(100,200), function (self)
-                                if self.speed > 0 then self.speed = zutil.relu(self.speed - .15 * GlobalDT) end
+                            math.random(40,80), function (self)
+                                if self.speed > 0 then self.speed = zutil.relu(self.speed - .04 * GlobalDT) end
                             end))
+                        end
+
+                        zutil.playsfx(SFX.hitCel, .3, math.random()/10+.95)
+                        zutil.playsfx(SFX.thump, 2, 1)
+
+                        item.target.shake = 3
+
+                        if CountLiveCels(item.target) == 0 then
+                            DeclareGuyAsDead(item.target)
                         end
 
                         return true
@@ -119,6 +129,8 @@ function LoadGuyIntoTeam(teamIndex, guyEncyclopediaIndex)
     guy.sprite = love.graphics.newImage("assets/guys/" .. guy.name .. ".png", {dpiscale = GuyRendering.guyDPIScale})
     guy.myTeamIndex = teamIndex
     guy.myGuyIndexInTheTeam = #Teams[teamIndex]
+
+    guy.shake = 0
 end
 
 function Trigger(guyTable, triggerName, ...)
@@ -136,23 +148,40 @@ function DrawGuysAndTheirCels()
     for teamIndex, team in ipairs(Teams) do
         for guyIndex, guyData in ipairs(team) do
             local gx, gy = GetGuyRenderCoords(teamIndex, guyIndex)
-            love.graphics.setColor(1,1,1)
+            gx, gy = gx + zutil.jitter(guyData.shake), gy + zutil.jitter(guyData.shake)
+
+            love.graphics.setColor((guyData.dead and {1,0,0,.4} or {1,1,1}))
             love.graphics.draw(guyData.sprite, gx, gy)
+
+            local isSelected = SelectingCelsToAffect.running and SelectingCelsToAffect.targetGuyIndex == guyIndex and SelectingCelsToAffect.targetTeamIndex == teamIndex
+
+            if isSelected then
+                local padding = 5
+                love.graphics.setColor(1,0,0)
+                love.graphics.setLineWidth(3)
+                love.graphics.rectangle("line", gx - padding, gy - padding, guyData.sprite:getWidth() + padding * 2, guyData.sprite:getHeight() + padding * 2)
+            end
 
             -- cels
             for cy, row in ipairs(guyData.cels) do
                 for cx, cel in ipairs(row) do
                     local x, y, renderWidth = GetCelRenderCoordsAndWidth(teamIndex, guyIndex, cx, cy)
+                    x, y = x + zutil.jitter(guyData.shake), y + zutil.jitter(guyData.shake)
 
-                    love.graphics.setColor(1,1,1, (cel > 0 and 1 or .35))
+                    love.graphics.setColor((guyData.dead and {1,0,0, GuyRendering.deadCelAlpha} or {1,1,1, (cel > 0 and 1 or GuyRendering.deadCelAlpha)}))
                     love.graphics.rectangle("fill", x, y, renderWidth, renderWidth)
 
-                    if SelectingCelsToAffect.running and SelectingCelsToAffect.guyIndex == guyIndex and SelectingCelsToAffect.celSelection[cy][cx] == 1 then
+                    if isSelected and SelectingCelsToAffect.celSelection[cy][cx] == 1 then
                         love.graphics.setColor(1,0,0)
-                        love.graphics.setLineWidth(2)
+                        love.graphics.setLineWidth(3)
                         love.graphics.rectangle("line", x, y, renderWidth, renderWidth)
                     end
                 end
+            end
+
+            -- shake
+            if guyData.shake > 0 then
+                guyData.shake = zutil.relu(guyData.shake - 0.06 * GlobalDT)
             end
         end
     end
@@ -186,6 +215,7 @@ function CheckMouseHoveringOverGuy()
             local gx, gy = GetGuyRenderCoords(teamIndex, guyIndex)
             if zutil.touching(mx, my, 0, 0, gx, gy, guyData.sprite:getWidth(), guyData.sprite:getHeight()) then
                 DisplayGuy(guyData)
+                return
             end
         end
     end
@@ -197,4 +227,21 @@ function DisplayGuy(guyData)
 
     love.graphics.setColor(1,1,1)
     love.graphics.draw(guyData.sprite, -guyData.sprite:getWidth() / 2 * scale, -guyData.sprite:getHeight() / 2 * scale, 0, scale)
+end
+
+
+
+function CountLiveCels(guyData)
+    local count = 0
+    for _, row in ipairs(guyData.cels) do
+        for _, cel in ipairs(row) do
+            if cel == 1 then count = count + 1 end
+        end
+    end
+    return count
+end
+
+function DeclareGuyAsDead(target)
+    target.dead = true
+    zutil.playsfx(SFX.guyDead, .4, .8)
 end
